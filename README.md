@@ -1,15 +1,20 @@
 # FacetWP ElasticPress Integration
-FacetWP ElasticPress Integration plugin adds ElasticPress support for FacetWP search facets. Plugin supports multiple "ElasticPress engines", which could have their own settings like "post_type" and "search_fields". Engine settings are defined by using ElasticPress supported WP_Query arguments, when registering a new search engine.
+
+Adds ElasticPress support for FacetWP search facets. Supports multiple ElasticPress engines with their own settings (for example `post_type` and `search_fields`). Engine settings use ElasticPress-supported `WP_Query` arguments when registering a search engine.
 
 ## Requirements
-- Buy, install and configure [FacetWP](https://facetwp.com/)
-- Install and configure [ElasticPress](https://github.com/10up/ElasticPress) and Elasticsearch server
+
+- [FacetWP](https://facetwp.com/)
+- [ElasticPress](https://github.com/10up/ElasticPress) and an Elasticsearch server
 
 ## Installation
-- Clone or copy this repo into your plugins directory
+
+- Clone or copy this repo into your WordPress plugins directory
+- Activate **FacetWP ElasticPress Integration** in the WordPress admin
 
 ## Default search engine
-Default search engine searches all registered post types using ElasticPress' default search fields:
+
+The default search engine searches all registered post types using ElasticPress' default search fields:
 
 ```php
 $defaults = array(
@@ -25,18 +30,27 @@ $defaults = array(
 
 ## Register new engines
 
-New search engines can be added by using VAFAEL()->register_engine -method in the "init" hook.
-The first parameter is the name of the engine and the second parameter accepts engine's WP_Query arguments.
+Register additional engines with `VAFAEL()->register_engine()` on the `init` hook. The first parameter is the engine name; the second accepts engine `WP_Query` arguments.
 
 ```php
-add_action('init', function(){
+add_action( 'init', function() {
 	VAFAEL()->register_engine( 'ElasticPress Page search', array( 'post_type' => 'page' ) );
-});
+} );
 ```
-Registered ElasticPress engines are added to the search engine dropdown of the search facet.
+
+Registered ElasticPress engines appear in the search engine dropdown on search facets.
 
 ## Usage
-- Add a new search facet
-- Select "ElasticPress Default" or one of your custom engines as a search engine
-- Insert facet into your site
-- Enjoy a lightning fast search
+
+1. Add a new search facet
+2. Select **ElasticPress Default** or one of your custom engines
+3. Insert the facet into your site
+
+## Copyright and license
+
+Copyright 2016 Valu Digital Oy  
+Copyright 2026 FacetWP, LLC
+
+This project is a fork of the original [Valu FacetWP ElasticPress Integration](https://github.com/MikkoVirenius/vafael) plugin by Valu Digital Oy.
+
+Licensed under the GNU General Public License v3 or later. See [LICENSE](LICENSE) for the full license text.
