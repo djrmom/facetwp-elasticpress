@@ -10,7 +10,7 @@ Adds ElasticPress support for FacetWP search facets. Supports multiple ElasticPr
 ## Installation
 
 - Clone or copy this repo into your WordPress plugins directory
-- Activate **FacetWP ElasticPress Integration** in the WordPress admin
+- Activate **FacetWP - ElasticPress Integration** in the WordPress admin
 
 ## Default search engine
 
@@ -30,11 +30,11 @@ $defaults = array(
 
 ## Register new engines
 
-Register additional engines with `VAFAEL()->register_engine()` on the `init` hook. The first parameter is the engine name; the second accepts engine `WP_Query` arguments.
+Register additional engines with `FWPEP()->register_engine()` on the `init` hook. The first parameter is the engine name; the second accepts engine `WP_Query` arguments.
 
 ```php
 add_action( 'init', function() {
-	VAFAEL()->register_engine( 'ElasticPress Page search', array( 'post_type' => 'page' ) );
+	FWPEP()->register_engine( 'ElasticPress Page search', array( 'post_type' => 'page' ) );
 } );
 ```
 
