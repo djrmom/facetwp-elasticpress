@@ -30,18 +30,14 @@ class Valu_FacetWP_ElasticPress_Integration {
 	 */
 	public static function instance() {
 
-		include_once( ABSPATH . 'wp-admin/includes/plugin.php' );
-
 		// Check that dependencies are installed and activated
-		if ( is_plugin_active( 'ElasticPress/elasticpress.php' ) AND is_plugin_active( 'facetwp/index.php' ) ) {
+		if ( ! isset( self::$instance ) ) {
 
-			if ( null == self::$instance ) {
-				self::$instance = new self;
-			}
+            self::$instance = new self;
 
-			return self::$instance;
+        }
 
-		}
+        return self::$instance;
 
 	} // end instance;
 
@@ -49,6 +45,17 @@ class Valu_FacetWP_ElasticPress_Integration {
 	 * Valu_FacetWP_ElasticPress_Integration constructor.
 	 */
 	private function __construct() {
+
+		add_action( 'init', array( $this, 'init' )  );
+
+	}
+
+	function init() {
+
+		// Soft deps: FacetWP + ElasticPress must both be loaded.
+		if ( ! function_exists( 'FWP' ) || ! defined( 'EP_VERSION' ) ) {
+			return;
+		}
 
 		add_filter( 'facetwp_facet_filter_posts', array( $this, 'search_facet' ), 10, 2 );
 		add_filter( 'facetwp_facet_search_engines', array( $this, 'search_engines' ) );
