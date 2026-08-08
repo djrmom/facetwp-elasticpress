@@ -55,6 +55,8 @@ class FacetWP_ElasticPress_Integration {
 		// Register default search engine
 		$this->register_engine( 'ElasticPress Default' );
 
+		do_action( 'facetwp_elasticpress_register_engine ' );
+
 	}
 
 	/**
@@ -73,7 +75,7 @@ class FacetWP_ElasticPress_Integration {
 
 		$args['label'] = $engine_name;
 
-		$engine_key = sanitize_key( $engine_name );
+		$engine_key = 'elp_' . sanitize_key( $engine_name );
 
 		if ( empty( $engine_key ) || strlen( $engine_key ) > 40 ) {
 			return false;
@@ -90,7 +92,7 @@ class FacetWP_ElasticPress_Integration {
 		 * @param string $engine_key Engine name.
 		 * @param $engine_properties Arguments used to register the engine.
 		 */
-		do_action( 'registered_facetwp_elasticpress_engine', $engine_key, $engine_properties );
+		do_action( 'facetwp_elasticpress_engine_registered', $engine_key, $engine_properties );
 
 		return $engine_properties;
 
@@ -116,7 +118,7 @@ class FacetWP_ElasticPress_Integration {
 		 * @param array $args Array of arguments for registering a new elasticpress engine.
 		 * @param string $engine_key Engine key.
 		 */
-		$args = apply_filters( 'register_facetwp_elasticpress_engine_args', $args, $engine_key );
+		$args = apply_filters( 'facetwp_elasticpress_engine_default_args', $args, $engine_key );
 
 		$defaults = array(
 			'post_type'     => 'any'
@@ -161,7 +163,7 @@ class FacetWP_ElasticPress_Integration {
 		 *
 		 * @param string $engine_key Search Engine key.
 		 */
-		do_action( 'deregistered_facetwp_elasticpress_engine', $engine_key );
+		do_action( 'facetwp_elasticpress_engine_deregistered', $engine_key );
 
 		return true;
 
@@ -192,23 +194,27 @@ class FacetWP_ElasticPress_Integration {
 	 */
 	function search_facet( $return, $params ) {
 
-		$facet           = $params['facet'];
-		$selected_values = $params['selected_values'];
-		$selected_values = is_array( $selected_values ) ? $selected_values[0] : $selected_values;
+		$facet = $params['facet'];
+        $selected_values = $params['selected_values'];
+        $selected_values = is_array( $selected_values ) ? $selected_values[0] : $selected_values;
+        $engine = $facet['search_engine'] ?? '';
 
-		if ( ! empty( $facet['search_engine'] ) ) {
+		if ( 'search' == $facet['type'] && 0 === strpos( $engine, 'elp_' ) ) {
 
 			if ( empty( $selected_values ) ) {
 				return 'continue';
 			}
 
 			$defaults = array(
-				's'       => $selected_values,
-				'facetwp' => true
+				's' => $selected_values
 			);
 
 			// Merge defaults with engine settings
 			$elasticpress_query_args = array_merge( $defaults, $this->engines[ $facet['search_engine'] ] );
+
+			if ( 'no' == $facet['enable_relevance'] ) {
+				add_filter( 'facetwp_use_search_relevancy', '__return_false' );
+			}
 
 			$elasticpress_query = new WP_Query( $elasticpress_query_args );
 
