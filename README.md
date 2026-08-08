@@ -30,10 +30,10 @@ $defaults = array(
 
 ## Register new engines
 
-Register additional engines with `FWPEP()->register_engine()` on the `init` hook. The first parameter is the engine name; the second accepts engine `WP_Query` arguments.
+Register additional engines with `FWPEP()->register_engine()` on the `facetwp_elasticpress_register_engine` hook. The first parameter is the engine name; the second accepts engine `WP_Query` arguments.
 
 ```php
-add_action( 'init', function() {
+add_action( 'facetwp_elasticpress_register_engine', function() {
 	FWPEP()->register_engine( 'ElasticPress Page search', array( 'post_type' => 'page' ) );
 } );
 ```
