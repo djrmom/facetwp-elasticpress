@@ -42,6 +42,9 @@ class FacetWP_ElasticPress_Integration {
 
 	}
 
+	/**
+	 * initialize plugin
+	 */
 	function init() {
 
 		// Soft deps: FacetWP + ElasticPress must both be loaded.
@@ -49,13 +52,15 @@ class FacetWP_ElasticPress_Integration {
 			return;
 		}
 
+		add_filter( 'facetwp_search_query_args', array( $this, 'default_search' ), 10, 2 );
 		add_filter( 'facetwp_facet_filter_posts', array( $this, 'search_facet' ), 10, 2 );
 		add_filter( 'facetwp_facet_search_engines', array( $this, 'search_engines' ) );
 
 		// Register default search engine
 		$this->register_engine( 'ElasticPress Default' );
 
-		do_action( 'facetwp_elasticpress_register_engine ' );
+		// action to register additional engines
+		do_action( 'facetwp_elasticpress_register_engine' );
 
 	}
 
@@ -239,6 +244,21 @@ class FacetWP_ElasticPress_Integration {
 
 		return $engines;
 
+	}
+
+	/**
+	 * bypasses elasticpress if engine is 'WP Default'
+	 */
+	function default_search( $search_args, $params ) {
+
+		$facet = $params['facet'];
+        $engine = $facet['search_engine'] ?? '';
+
+		if ( 'search' == $facet['type'] && empty( $facet['search_engine'] ) ) {
+			$search_args['ep_integrate'] = false;
+		}
+
+		return $search_args;
 	}
 
 }

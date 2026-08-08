@@ -30,7 +30,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // setup variables
 define( 'FACETWP_ELASTICPRESS_VERSION', '0.1.0' );
-define( 'FACETWP_ELASTICPRESS_URL', plugins_url( '', __FILE__ ) );
 define( 'FACETWP_ELASTICPRESS_DIR', dirname( __FILE__ ) );
 define( 'FACETWP_ELASTICPRESS_BASENAME', plugin_basename( __FILE__ ) );
 
