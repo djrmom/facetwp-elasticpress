@@ -6,10 +6,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class FacetWP_ElasticPress_Integration {
 
-	public $engines;
+	public array $engines = [];
 
 	/** Refers to a single instance of this class. */
-	private static $instance = null;
+	private static ?self $instance = null;
 
 	/*--------------------------------------------*
 	 * Constructor
@@ -18,43 +18,40 @@ class FacetWP_ElasticPress_Integration {
 	/**
 	 * Creates or returns an instance of this class.
 	 *
-	 * @return  FacetWP_ElasticPress_Integration A single instance of this class.
+	 * @return FacetWP_ElasticPress_Integration A single instance of this class.
 	 */
-	public static function instance() {
+	public static function instance(): self {
 
-		// Check that dependencies are installed and activated
 		if ( ! isset( self::$instance ) ) {
+			self::$instance = new self();
+		}
 
-            self::$instance = new self;
+		return self::$instance;
 
-        }
-
-        return self::$instance;
-
-	} // end instance;
+	}
 
 	/**
 	 * FacetWP_ElasticPress_Integration constructor.
 	 */
 	private function __construct() {
 
-		add_action( 'init', array( $this, 'init' )  );
+		add_action( 'init', [ $this, 'init' ] );
 
 	}
 
 	/**
 	 * initialize plugin
 	 */
-	function init() {
+	public function init(): void {
 
 		// Soft deps: FacetWP + ElasticPress must both be loaded.
 		if ( ! function_exists( 'FWP' ) || ! defined( 'EP_VERSION' ) ) {
 			return;
 		}
 
-		add_filter( 'facetwp_search_query_args', array( $this, 'default_search' ), 10, 2 );
-		add_filter( 'facetwp_facet_filter_posts', array( $this, 'search_facet' ), 10, 2 );
-		add_filter( 'facetwp_facet_search_engines', array( $this, 'search_engines' ) );
+		add_filter( 'facetwp_search_query_args', [ $this, 'default_search' ], 10, 2 );
+		add_filter( 'facetwp_facet_filter_posts', [ $this, 'search_facet' ], 10, 2 );
+		add_filter( 'facetwp_facet_search_engines', [ $this, 'search_engines' ] );
 
 		// Register default search engine
 		$this->register_engine( 'ElasticPress Default' );
@@ -67,16 +64,12 @@ class FacetWP_ElasticPress_Integration {
 	/**
 	 * Register a new engine
 	 *
-	 * @param $engine_name
-	 * @param $args
+	 * @param string $engine_name
+	 * @param array  $args
 	 *
-	 * @return bool
+	 * @return array|false
 	 */
-	function register_engine( $engine_name, $args = array() ) {
-
-		if ( ! is_array( $this->engines ) ) {
-			$this->engines = array();
-		}
+	public function register_engine( string $engine_name, array $args = [] ) {
 
 		$args['label'] = $engine_name;
 
@@ -84,7 +77,7 @@ class FacetWP_ElasticPress_Integration {
 
 		if ( empty( $engine_key ) || strlen( $engine_key ) > 40 ) {
 			return false;
-		};
+		}
 
 		$engine_properties = $this->set_engine_properties( $engine_key, $args );
 
@@ -93,9 +86,8 @@ class FacetWP_ElasticPress_Integration {
 		/**
 		 * Fires after a engine is registered.
 		 *
-		 *
 		 * @param string $engine_key Engine name.
-		 * @param $engine_properties Arguments used to register the engine.
+		 * @param array  $engine_properties Arguments used to register the engine.
 		 */
 		do_action( 'facetwp_elasticpress_engine_registered', $engine_key, $engine_properties );
 
@@ -107,11 +99,11 @@ class FacetWP_ElasticPress_Integration {
 	 * Set search engine properties
 	 *
 	 * @param string $engine_key
-	 * @param array $args
+	 * @param array  $args
 	 *
 	 * @return array
 	 */
-	function set_engine_properties( $engine_key = '', $args = array() ) {
+	public function set_engine_properties( string $engine_key = '', array $args = [] ): array {
 
 		$args = wp_parse_args( $args );
 
@@ -120,36 +112,26 @@ class FacetWP_ElasticPress_Integration {
 		 *
 		 * @since 0.1.0
 		 *
-		 * @param array $args Array of arguments for registering a new elasticpress engine.
+		 * @param array  $args Array of arguments for registering a new elasticpress engine.
 		 * @param string $engine_key Engine key.
 		 */
 		$args = apply_filters( 'facetwp_elasticpress_engine_default_args', $args, $engine_key );
 
-		$defaults = [];  // a search with no added $args will use the elasticpress settings in dashboard
-
-		$args = array_merge( $defaults, $args );
-
-		if ( null === $args['label'] ) {
-			$args['label'] = $engine_key;
-		}
+		// Missing or null label falls back to engine key; empty string is kept.
+		$args['label'] ??= $engine_key;
 
 		return $args;
 
 	}
 
-
 	/**
 	 * Deregister search engine
 	 *
-	 * @param $engine_key
+	 * @param string $engine_key
 	 *
 	 * @return bool
 	 */
-	function deregister_engine( $engine_key ) {
-
-		if ( ! is_array( $this->engines ) ) {
-			$this->engines = array();
-		}
+	public function deregister_engine( string $engine_key ): bool {
 
 		$engine_key = sanitize_key( $engine_key );
 
@@ -179,7 +161,7 @@ class FacetWP_ElasticPress_Integration {
 	 *
 	 * @return bool
 	 */
-	function engine_exists( $engine_key = '' ) {
+	public function engine_exists( string $engine_key = '' ): bool {
 
 		if ( ! $engine_key ) {
 			return false;
@@ -193,29 +175,30 @@ class FacetWP_ElasticPress_Integration {
 
 	/**
 	 * Intercept search facets using ElasticPress engine
+	 *
 	 * @since 0.1.0
 	 */
-	function search_facet( $return, $params ) {
+	public function search_facet( $return, $params ) {
 
-		$facet = $params['facet'];
-        $selected_values = $params['selected_values'];
-        $selected_values = is_array( $selected_values ) ? $selected_values[0] : $selected_values;
-        $engine = $facet['search_engine'] ?? '';
+		$facet           = $params['facet'] ?? [];
+		$selected_values = $params['selected_values'] ?? '';
+		$selected_values = is_array( $selected_values ) ? $selected_values[0] : $selected_values;
+		$engine          = $facet['search_engine'] ?? '';
 
-		if ( 'search' == $facet['type'] && 0 === strpos( $engine, 'elp_' ) ) {
+		if ( 'search' === ( $facet['type'] ?? '' ) && 0 === strpos( $engine, 'elp_' ) ) {
 
 			if ( empty( $selected_values ) ) {
 				return 'continue';
 			}
 
-			$defaults = array(
-				's' => $selected_values
-			);
+			$defaults = [
+				's' => $selected_values,
+			];
 
 			// Merge defaults with engine settings
-			$elasticpress_query_args = array_merge( $defaults, $this->engines[ $facet['search_engine'] ] );
+			$elasticpress_query_args = [ ...$defaults, ...$this->engines[ $facet['search_engine'] ] ];
 
-			if ( 'no' == $facet['enable_relevance'] ) {
+			if ( 'no' === ( $facet['enable_relevance'] ?? '' ) ) {
 				add_filter( 'facetwp_use_search_relevancy', '__return_false' );
 			}
 
@@ -228,13 +211,12 @@ class FacetWP_ElasticPress_Integration {
 		return $return;
 	}
 
-
 	/**
 	 * Add engines to the search facet
 	 */
-	function search_engines( $engines ) {
+	public function search_engines( array $engines ): array {
 
-		if ( $this->engines and is_array( $this->engines ) ) {
+		if ( $this->engines ) {
 			foreach ( $this->engines as $engine_key => $engine_properties ) {
 				$engines[ $engine_key ] = $engine_properties['label'];
 			}
@@ -247,12 +229,11 @@ class FacetWP_ElasticPress_Integration {
 	/**
 	 * bypasses elasticpress if engine is 'WP Default'
 	 */
-	function default_search( $search_args, $params ) {
+	public function default_search( array $search_args, array $params ): array {
 
-		$facet = $params['facet'];
-        $engine = $facet['search_engine'] ?? '';
+		$facet = $params['facet'] ?? [];
 
-		if ( 'search' == $facet['type'] && empty( $facet['search_engine'] ) ) {
+		if ( 'search' === ( $facet['type'] ?? '' ) && empty( $facet['search_engine'] ) ) {
 			$search_args['ep_integrate'] = false;
 		}
 
@@ -263,8 +244,10 @@ class FacetWP_ElasticPress_Integration {
 
 /**
  * Create a instance of the class
+ *
+ * @return FacetWP_ElasticPress_Integration
  */
-function FWPEP() {
+function FWPEP(): FacetWP_ElasticPress_Integration {
 	return FacetWP_ElasticPress_Integration::instance();
 }
 
