@@ -14,19 +14,7 @@ Adds ElasticPress support for FacetWP search facets. Supports multiple ElasticPr
 
 ## Default search engine
 
-The default search engine searches all registered post types using ElasticPress' default search fields:
-
-```php
-$defaults = array(
-	'post_type'     => 'any',
-	'search_fields' => array(
-		'post_title',
-		'post_content',
-		'post_excerpt',
-		'taxonomies' => array( 'category', 'post_tag' ),
-	)
-);
-```
+The default search engine searches all registered post types using ElasticPress' configuration in the plugin settings.
 
 ## Register new engines
 
@@ -34,8 +22,22 @@ Register additional engines with `FWPEP()->register_engine()` on the `facetwp_el
 
 ```php
 add_action( 'facetwp_elasticpress_register_engine', function() {
-	FWPEP()->register_engine( 'ElasticPress Page search', array( 'post_type' => 'page' ) );
+	FWPEP()->register_engine( 'ElasticPress Page search', $array( 'post_type' => 'page' )$ );
 } );
+```
+
+Args can be in the form of:
+
+```php
+$args = array(
+	'post_type'     => 'post',
+	'search_fields' => array(
+		'post_title',
+		'post_content',
+		'post_excerpt',
+		'taxonomies' => array( 'category', 'post_tag' ),
+	)
+);
 ```
 
 Registered ElasticPress engines appear in the search engine dropdown on search facets.
