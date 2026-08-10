@@ -125,9 +125,7 @@ class FacetWP_ElasticPress_Integration {
 		 */
 		$args = apply_filters( 'facetwp_elasticpress_engine_default_args', $args, $engine_key );
 
-		$defaults = array(
-			'post_type'     => 'any'
-		);
+		$defaults = [];  // a search with no added $args will use the elasticpress settings in dashboard
 
 		$args = array_merge( $defaults, $args );
 
