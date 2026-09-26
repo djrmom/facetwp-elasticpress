@@ -52,6 +52,7 @@ class FacetWP_ElasticPress_Integration {
 		add_filter( 'facetwp_search_query_args', [ $this, 'default_search' ], 10, 2 );
 		add_filter( 'facetwp_facet_filter_posts', [ $this, 'search_facet' ], 10, 2 );
 		add_filter( 'facetwp_facet_search_engines', [ $this, 'search_engines' ] );
+		add_filter( 'ep_ajax_wp_query_integration', [ $this, 'integrate_facetwp_refresh' ] );
 
 		// Register default search engine
 		$this->register_engine( 'ElasticPress Default' );
@@ -238,6 +239,26 @@ class FacetWP_ElasticPress_Integration {
 		}
 
 		return $search_args;
+	}
+
+	/**
+	 * Allow ElasticPress to integrate FacetWP admin-ajax refreshes.
+	 *
+	 * FacetWP copies the JSON body into $_POST before the search query runs.
+	 *
+	 * @param bool $integrate Whether admin-ajax queries are integrated.
+	 * @return bool
+	 */
+	public function integrate_facetwp_refresh( bool $integrate ): bool {
+
+		if ( $integrate ) {
+			return true;
+		}
+
+		$action = isset( $_POST['action'] ) ? sanitize_key( wp_unslash( (string) $_POST['action'] ) ) : '';
+
+		return 'facetwp_refresh' === $action;
+
 	}
 
 }
