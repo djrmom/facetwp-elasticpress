@@ -8,6 +8,19 @@ class FacetWP_ElasticPress_Integration {
 
 	public array $engines = [];
 
+	/** Search keywords from the native WordPress search page. */
+	public string $keywords = '';
+
+	/** Cached ElasticPress results for the native search page. */
+	public array $posts = [];
+
+	/**
+	 * True until FacetWP's render query has been short-circuited.
+	 *
+	 * The main query runs after that, so pre_get_posts can tell the two apart.
+	 */
+	public bool $first_run = true;
+
 	/** Refers to a single instance of this class. */
 	private static ?self $instance = null;
 
@@ -53,6 +66,14 @@ class FacetWP_ElasticPress_Integration {
 		add_filter( 'facetwp_facet_filter_posts', [ $this, 'search_facet' ], 10, 2 );
 		add_filter( 'facetwp_facet_search_engines', [ $this, 'search_engines' ] );
 		add_filter( 'ep_ajax_wp_query_integration', [ $this, 'integrate_facetwp_refresh' ] );
+
+		// Native WordPress search page. The setting is read inside is_main_query()
+		// because FWP()->helper does not exist until FacetWP's init at priority 20.
+		add_filter( 'facetwp_is_main_query', [ $this, 'is_main_query' ], 10, 2 );
+		add_action( 'pre_get_posts', [ $this, 'pre_get_posts' ], 1000 );
+		add_filter( 'posts_pre_query', [ $this, 'posts_pre_query' ], 10, 2 );
+		add_filter( 'posts_results', [ $this, 'posts_results' ], 10, 2 );
+		add_filter( 'facetwp_settings_admin', [ $this, 'admin_settings' ], 10, 2 );
 
 		// Register default search engine
 		$this->register_engine( 'ElasticPress Default' );
@@ -258,6 +279,239 @@ class FacetWP_ElasticPress_Integration {
 		$action = isset( $_POST['action'] ) ? sanitize_key( wp_unslash( (string) $_POST['action'] ) ) : '';
 
 		return 'facetwp_refresh' === $action;
+
+	}
+
+	/**
+	 * Run and cache an ElasticPress search for the native WordPress search page.
+	 *
+	 * Fires from FacetWP before it snapshots the main query, so using_elasticpress
+	 * is inherited by the bucket query and the render query.
+	 *
+	 * @param bool     $is_main_query Whether FacetWP treats this as its main query.
+	 * @param WP_Query $query         Query being checked.
+	 * @return bool
+	 */
+	public function is_main_query( bool $is_main_query, $query ): bool {
+
+		if ( 'yes' === FWP()->helper->get_setting( 'elp_disable_default_search', 'no' ) ) {
+			return $is_main_query;
+		}
+
+		$keywords = $query->get( 's' );
+
+		if ( $is_main_query && $query->is_main_query() && $query->is_search() && is_string( $keywords ) && '' !== $keywords ) {
+			$args           = stripslashes_deep( $this->get_valid_args( $query ) );
+			$this->keywords = (string) $args['s'];
+			$this->posts    = $this->run_query( $args );
+			$query->set( 'using_elasticpress', true );
+		}
+
+		return $is_main_query;
+
+	}
+
+	/**
+	 * Whitelist query arguments ElasticPress can apply to the native search.
+	 *
+	 * @param WP_Query $query Main search query.
+	 * @return array
+	 */
+	public function get_valid_args( $query ): array {
+
+		$output = [];
+
+		$valid = [
+			's', 'post__in', 'post__not_in', 'post_type', 'post_status',
+			'tax_query', 'meta_query', 'date_query', 'order', 'orderby',
+		];
+
+		foreach ( $valid as $arg ) {
+			$val = $query->get( $arg );
+			if ( ! empty( $val ) || 's' === $arg ) {
+				$output[ $arg ] = $val;
+			}
+		}
+
+		return $output;
+
+	}
+
+	/**
+	 * Run one ElasticPress search and return the posts.
+	 *
+	 * Full post objects are kept so highlighting merged by ElasticPress survives.
+	 * facetwp_elasticpress marks the query so the callbacks below leave it alone.
+	 *
+	 * @param array $args Query arguments.
+	 * @return array
+	 */
+	public function run_query( array $args ): array {
+
+		/**
+		 * Filter how many ElasticPress matches are kept for the native search page.
+		 *
+		 * This caps the whole listing, not one facet. ElasticPress itself will not
+		 * return more than ep_max_results_window (10000 by default).
+		 *
+		 * @param int $max_results Maximum posts to request.
+		 */
+		$max_results = (int) apply_filters( 'facetwp_elasticpress_max_results', 200 );
+
+		$overrides = [
+			'ep_integrate'         => true,
+			'posts_per_page'       => $max_results,
+			'paged'                => 1,
+			'no_found_rows'        => true,
+			'facetwp'              => false,
+			'facetwp_elasticpress' => true,
+		];
+
+		$query = new WP_Query( array_merge( $args, $overrides ) );
+
+		return is_array( $query->posts ) ? $query->posts : [];
+
+	}
+
+	/**
+	 * Point the main query at the filtered ElasticPress IDs.
+	 *
+	 * Priority 1000 runs after FacetWP_Request::update_query_vars(). Every
+	 * using_elasticpress query except the cached search itself is kept off
+	 * Elasticsearch. Once the render query has been short-circuited, the main
+	 * query is rewritten so MySQL does not re-apply the search SQL.
+	 *
+	 * @param WP_Query $query Query being prepared.
+	 */
+	public function pre_get_posts( $query ): void {
+
+		if ( true === $query->get( 'facetwp_elasticpress' ) || true !== $query->get( 'using_elasticpress' ) ) {
+			return;
+		}
+
+		$query->set( 'ep_integrate', false );
+
+		if ( true === $query->get( 'facetwp' ) && ! $this->first_run ) {
+			$query->set( 's', '' );
+
+			$post_ids = FWP()->filtered_post_ids;
+			$post_ids = empty( $post_ids ) ? [ 0 ] : $post_ids;
+			$query->set( 'post__in', $post_ids );
+
+			if ( '' === $query->get( 'post_type' ) ) {
+				$query->set( 'post_type', 'any' );
+				$query->set( 'post_status', 'any' );
+			}
+
+			if ( '' === $query->get( 'orderby' ) ) {
+				$query->set( 'orderby', 'post__in' );
+			}
+		}
+
+	}
+
+	/**
+	 * Serve cached ElasticPress IDs, and skip the queries FacetWP does not use.
+	 *
+	 * facetwp false is get_filtered_post_ids(). Return the cached IDs and skip SQL.
+	 *
+	 * facetwp true on the first pass is FacetWP's render query. Return an empty
+	 * list so it does not hit the database; the theme loop uses the main query.
+	 *
+	 * facetwp true after that is the main query. Restore the keyword for the
+	 * search form, and let the SQL built in pre_get_posts run.
+	 *
+	 * @param array|null $posts Posts, or null when the query has not run.
+	 * @param WP_Query   $query Query about to run.
+	 * @return array|null
+	 */
+	public function posts_pre_query( $posts, $query ) {
+
+		if ( true === $query->get( 'facetwp_elasticpress' ) || true !== $query->get( 'using_elasticpress' ) ) {
+			return $posts;
+		}
+
+		if ( true === $query->get( 'facetwp' ) ) {
+			$query->set( 's', $this->keywords );
+
+			if ( $this->first_run ) {
+				$this->first_run = false;
+
+				$filtered             = FWP()->filtered_post_ids;
+				$per_page             = (int) $query->get( 'posts_per_page', get_option( 'posts_per_page' ) );
+				$query->found_posts   = is_array( $filtered ) ? count( $filtered ) : 0;
+				$query->max_num_pages = ( 0 < $per_page ) ? (int) ceil( $query->found_posts / $per_page ) : 0;
+
+				return [];
+			}
+		} else {
+			return wp_list_pluck( $this->posts, 'ID' );
+		}
+
+		return $posts;
+
+	}
+
+	/**
+	 * Swap the main query's posts for the cached ElasticPress objects.
+	 *
+	 * ElasticPress merges search highlights onto those objects. The SQL query
+	 * only supplies order and pagination.
+	 *
+	 * @param array    $posts Posts for the current page.
+	 * @param WP_Query $query Query that produced them.
+	 * @return array
+	 */
+	public function posts_results( $posts, $query ): array {
+
+		if ( true === $query->get( 'facetwp_elasticpress' ) || true !== $query->get( 'using_elasticpress' ) ) {
+			return $posts;
+		}
+
+		if ( true === $query->get( 'facetwp' ) && ! $this->first_run ) {
+			$lookup = [];
+
+			foreach ( $this->posts as $post ) {
+				if ( is_object( $post ) && isset( $post->ID ) ) {
+					$lookup[ (int) $post->ID ] = $post;
+				}
+			}
+
+			foreach ( $posts as $index => $post ) {
+				$post_id = is_object( $post ) ? (int) $post->ID : (int) $post;
+
+				if ( ! isset( $lookup[ $post_id ] ) ) {
+					continue;
+				}
+
+				$cached = $lookup[ $post_id ];
+
+				// stdClass hits lose their highlight fields if the loop reloads them by ID.
+				$posts[ $index ] = ( $cached instanceof WP_Post ) ? $cached : new WP_Post( $cached );
+			}
+		}
+
+		return $posts;
+
+	}
+
+	/**
+	 * Add the ElasticPress section to the FacetWP settings screen.
+	 *
+	 * @param array $settings Registered FacetWP settings.
+	 * @param FacetWP_Settings $class FacetWP settings renderer.
+	 * @return array
+	 */
+	public function admin_settings( array $settings, $class ): array {
+
+		$settings['elasticpress']['label'] = 'ElasticPress';
+		$settings['elasticpress']['fields']['elp_disable_default_search'] = [
+			'label' => 'Disable on default search page',
+			'notes' => 'Leaves the default WordPress search page to ElasticPress\' own query integration.',
+			'html'  => $class->get_setting_html( 'elp_disable_default_search', 'toggle' ),
+		];
+
+		return $settings;
 
 	}
 
