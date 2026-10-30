@@ -6,6 +6,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class FacetWP_ElasticPress_Integration {
 
+	/**
+	 * Display name for the built-in ElasticPress search engine.
+	 *
+	 * @since 0.1.1
+	 * @var string
+	 */
+	const DEFAULT_ENGINE = 'ElasticPress Default';
+
 	public array $engines = [];
 
 	/** Search keywords from the native WordPress search page. */
@@ -76,10 +84,24 @@ class FacetWP_ElasticPress_Integration {
 		add_filter( 'facetwp_settings_admin', [ $this, 'admin_settings' ], 10, 2 );
 
 		// Register default search engine
-		$this->register_engine( 'ElasticPress Default' );
+		$this->register_engine( self::DEFAULT_ENGINE );
 
 		// action to register additional engines
 		do_action( 'facetwp_elasticpress_register_engine' );
+
+	}
+
+	/**
+	 * Build an engine key from a display name.
+	 *
+	 * @since 0.1.1
+	 *
+	 * @param string $engine_name Engine display name.
+	 * @return string Engine key with the elp_ prefix.
+	 */
+	public function get_engine_key( string $engine_name ): string {
+
+		return 'elp_' . sanitize_key( $engine_name );
 
 	}
 
@@ -95,9 +117,25 @@ class FacetWP_ElasticPress_Integration {
 
 		$args['label'] = $engine_name;
 
-		$engine_key = 'elp_' . sanitize_key( $engine_name );
+		$sanitized  = sanitize_key( $engine_name );
+		$engine_key = $this->get_engine_key( $engine_name );
 
-		if ( empty( $engine_key ) || strlen( $engine_key ) > 40 ) {
+		if ( '' === $sanitized || strlen( $engine_key ) > 40 ) {
+			return false;
+		}
+
+		if ( $this->engine_exists( $engine_key ) ) {
+			_doing_it_wrong(
+				__METHOD__,
+				sprintf(
+					/* translators: 1: engine name, 2: resulting engine key */
+					__( 'The engine "%1$s" (key "%2$s") is already registered. The existing engine was kept.', 'fwp-elasticpress' ),
+					$engine_name,
+					$engine_key
+				),
+				'0.1.1'
+			);
+
 			return false;
 		}
 
