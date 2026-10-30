@@ -6,6 +6,7 @@ Adds ElasticPress support for FacetWP search facets. Supports multiple ElasticPr
 
 - [FacetWP](https://facetwp.com/)
 - [ElasticPress](https://github.com/10up/ElasticPress) and an Elasticsearch server
+- PHP 7.4 or later
 
 ## Installation
 
@@ -22,7 +23,7 @@ Register additional engines with `FWPEP()->register_engine()` on the `facetwp_el
 
 ```php
 add_action( 'facetwp_elasticpress_register_engine', function() {
-	FWPEP()->register_engine( 'ElasticPress Page search', $array( 'post_type' => 'page' )$ );
+	FWPEP()->register_engine( 'ElasticPress Page search', array( 'post_type' => 'page' ) );
 } );
 ```
 

@@ -3,7 +3,7 @@
 Plugin Name: FacetWP - ElasticPress Integration
 Plugin URI: https://facetwp.com
 Description: Adds ElasticPress search provider for FacetWP. Supports multiple engines.
-Version: 0.1.0
+Version: 0.1.1
 Requires PHP: 7.4
 Author: FacetWP
 Author URI: https://facetwp.com
