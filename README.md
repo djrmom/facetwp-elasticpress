@@ -40,7 +40,9 @@ $args = array(
 );
 ```
 
-Registered ElasticPress engines appear in the search engine dropdown on search facets.
+Engine keys are `elp_` plus `sanitize_key( $name )`. The first registration of a key wins; later duplicates are rejected with a `_doing_it_wrong()` notice. Avoid names that differ only by spaces or punctuation (for example `Product Search` and `product.search` share a key).
+
+Registered ElasticPress engines appear in the search engine dropdown on search facets. A facet pointing at an engine that is no longer registered falls back to ElasticPress Default. Facets using any other provider's engine (or WP Default) are handled by that provider or WordPress, not by ElasticPress.
 
 ## Usage
 
